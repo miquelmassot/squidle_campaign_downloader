@@ -220,13 +220,13 @@ def get_image_pose_and_url(
 
 
 def download_image_url(zipped_url_deployment_image_id):
-    url, deployment_id, image_id = zipped_url_deployment_image_id
+    url, deployment_id, image_id, output_folder = zipped_url_deployment_image_id
     a = urlparse(url.rstrip())
 
     deployment_id = int(deployment_id)
     image_id = int(image_id)
 
-    deployment_path = Path("squidle_campaign_download/" + str(deployment_id))
+    deployment_path = Path(output_folder) / str(deployment_id)
     if not deployment_path.exists():
         deployment_path.mkdir(parents=True, exist_ok=True)
 
@@ -281,7 +281,7 @@ if __name__ == "__main__":
     deployment_id_list = list(database["deployment_id"])
 
     zipped_list = [
-        (a, b, c)
+        (a, b, c, output)
         for a, b, c in zip(image_url_list, deployment_id_list, image_id_list)
     ]
 
