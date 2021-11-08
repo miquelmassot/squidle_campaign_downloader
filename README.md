@@ -1,6 +1,6 @@
 # Squidle campaign downloader
 
-Python script to download entire campaign images and navigation.
+Python script to download entire campaign images and navigation. 
 
     usage: squidle_campaign_downloader.py [-h] [--api-token API_TOKEN] --campaign CAMPAIGN [CAMPAIGN ...] [--url URL] [--output OUTPUT]
 
@@ -12,3 +12,10 @@ Python script to download entire campaign images and navigation.
                             List of campaign names (e.g. dy108-109_nerc_oceanids_class)
       --url URL             URL of squidle instance
       --output OUTPUT       Output folder
+
+
+## Example
+
+Download DY108/DY109 entire campaign from Squidle:
+
+    python squidle_campaign_downloader.py --campaign dy108-109_nerc_oceanids_class
