@@ -22,7 +22,7 @@ def imap_unordered_bar(func, args, n_processes=8):
     return res_list
 
 
-def find_deployments(session, campaign_list, url, api_token):
+def find_deployments(session, campaign_list, url):
     """Finds the deployment IDs for a list of campaigns
 
     Parameters
@@ -33,8 +33,6 @@ def find_deployments(session, campaign_list, url, api_token):
         List of campaign names
     url : str
         URL of SQUIDLE server
-    api_token : str
-        API token
 
     Returns
     -------
@@ -43,7 +41,6 @@ def find_deployments(session, campaign_list, url, api_token):
     """
 
     # Find the deployments for each campaign
-    headers = {"content-type": "application/json", "X-auth-token": api_token}
     deployment_list = []
     for campaign_name in tqdm(campaign_list):
         print("Looking for campaign:", campaign_name)
@@ -60,14 +57,13 @@ def find_deployments(session, campaign_list, url, api_token):
         params = {"q": json.dumps(json_request), "single": True}
 
         r = session.get(
-            url + "/api/deployment", params=params, headers=headers
+            url + "/api/deployment", params=params
         )
 
         if "<h1>500</h1>" in r.text:
             print("\nServer error\n")
         else:
             pretty_json = json.loads(r.text)
-            # print(json.dumps(pretty_json, indent=2))
 
             for obj in pretty_json.get("objects"):
                 deployment_list.append(obj.get("id"))
@@ -77,7 +73,7 @@ def find_deployments(session, campaign_list, url, api_token):
     return deployment_list
 
 
-def find_images_in_deployments(session, deployment_list, url, api_token):
+def find_images_in_deployments(session, deployment_list, url):
     """Finds images in a list of deployments
 
     Parameters
@@ -88,8 +84,6 @@ def find_images_in_deployments(session, deployment_list, url, api_token):
         List of deployment IDs
     url : str
         URL of SQUIDLE server
-    api_token : str
-        API token
 
     Returns
     -------
@@ -97,7 +91,6 @@ def find_images_in_deployments(session, deployment_list, url, api_token):
         list of image IDs
     """
     # Find the image URL and image ID for each deployment
-    headers = {"content-type": "application/json", "X-auth-token": api_token}
     image_ids = []
     image_deployment = []
     for deployment in tqdm(deployment_list):
@@ -117,18 +110,18 @@ def find_images_in_deployments(session, deployment_list, url, api_token):
             "single": True,
         }
 
-        r = session.get(url + "/api/media", params=params, headers=headers)
+        r = session.get(url + "/api/media", params=params)
 
         pretty_json = json.loads(r.text)
 
         num_results = pretty_json.get("num_results")
 
-        # print(json.dumps(pretty_json, indent=2))
         for obj in pretty_json.get("objects"):
             image_ids.append(obj.get("id"))
             image_deployment.append(deployment)
 
         num_pages = math.ceil(num_results / results_per_page)
+
 
         for page in tqdm(range(2, num_pages)):
             params = {
@@ -138,13 +131,11 @@ def find_images_in_deployments(session, deployment_list, url, api_token):
                 "single": True,
             }
 
-            r = session.get(url + "/api/media", params=params, headers=headers)
+            r = session.get(url + "/api/media", params=params)
 
             pretty_json = json.loads(r.text)
 
             num_results = pretty_json.get("num_results")
-
-            # print(json.dumps(pretty_json, indent=2))
             for obj in pretty_json.get("objects"):
                 image_ids.append(obj.get("id"))
                 image_deployment.append(deployment)
@@ -153,16 +144,11 @@ def find_images_in_deployments(session, deployment_list, url, api_token):
 
 def get_info_to_database(zipped_image_id_image_deployment):
     image_id, image_deployment = zipped_image_id_image_deployment
-    headers = {
-        "content-type": "application/json",
-        "X-auth-token": api_token,
-    }
     r = requests.get(
-        url + "/api/media_poses/" + str(image_id), headers=headers
+        url + "/api/media_poses/" + str(image_id)
     )
 
     pretty_json = json.loads(r.text)
-    # print(json.dumps(pretty_json, indent=2))
 
     media = pretty_json.get("media")
     pose = pretty_json.get("pose")
@@ -184,7 +170,7 @@ def get_info_to_database(zipped_image_id_image_deployment):
 
 
 def get_image_pose_and_url(
-    session, image_ids, image_deployment, url, api_token
+    image_ids, image_deployment
 ):
     database = pd.DataFrame(
         {
@@ -199,9 +185,6 @@ def get_image_pose_and_url(
         }
     )
 
-    # for image_id in tqdm(image_ids):
-    #    get_info_to_database(image_id, database)
-
     zipped_image_ids_deployment = [
         (a, b) for a, b in zip(image_ids, image_deployment)
     ]
@@ -211,7 +194,7 @@ def get_image_pose_and_url(
     )
 
     for result in results:
-        database = database.append(result, ignore_index=True)
+        database = pd.concat([database, result], ignore_index=True)
 
     database.deployment_id = database.deployment_id.astype(int)
     database.image_id = database.image_id.astype(int)
@@ -234,7 +217,6 @@ def download_image_url(zipped_url_deployment_image_id):
 
     res = requests.get(url.rstrip())
     img_data = res.content
-    # print("Downloading image", filename, "from URL:", url.rstrip())
     with open(filename, "wb") as handler:
         handler.write(img_data)
     return filename
@@ -255,19 +237,19 @@ if __name__ == "__main__":
     campaign_list = args.campaign
     output = args.output
 
-    if api_token is not None:
-        headers = {"content-type": "application/json", "X-auth-token": api_token}
-    else:
-        headers = {"content-type": "application/json"}
+    if api_token is None:
+        api_token = ""
 
     s = requests.Session()
-    deployment_list = find_deployments(s, campaign_list, url, api_token)
+    s.headers.update({"content-type": "application/json", "X-auth-token": api_token})
+
+    deployment_list = find_deployments(s, campaign_list, url)
     image_list, image_deployment_list = find_images_in_deployments(
-        s, deployment_list, url, api_token
+        s, deployment_list, url
     )
     print("Getting image poses and URLs (not downloading data yet)")
     database = get_image_pose_and_url(
-        s, image_list, image_deployment_list, url, api_token
+        image_list, image_deployment_list
     )
     output_folder = Path(output)
     if not output_folder.exists():
